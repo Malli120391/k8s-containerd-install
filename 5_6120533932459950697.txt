@@ -1,0 +1,111 @@
+==========COMMON FOR MASTER & SLAVES START ====
+
+# First, login as ‘root’ user because the following set of commands need to be executed with ‘sudo’ permissions.
+
+sudo su -
+
+# Update Package Manager
+
+apt-get update -y 
+
+#Turn Off Swap Space
+swapoff -a
+sed -i '/ swap / s/^\(.*\)$/#\1/g' /etc/fstab
+
+apt-get update -y
+
+
+2) Install Required packages and apt keys.
+
+apt-get install -y apt-transport-https -y
+
+curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add -
+
+cat <<EOF | tee /etc/apt/sources.list.d/kubernetes.list
+deb https://apt.kubernetes.io/ kubernetes-xenial main
+EOF
+
+apt-get update -y 
+
+3) Install kubeadm, Kubelet And Kubectl
+apt-get install -y kubelet kubeadm containerd kubectl
+apt-mark hold kubelet kubeadm kubectl containerd
+
+4) configure containerd.load the necessary modu;es for containerd:
+
+cat <<EOF | sudo tee /etc/modules-load.d/containerd.conf
+overlay
+br_netfilter
+EOF
+
+modprobe overlay
+modprobe br_netfilter
+
+5) Setup required the kernel parameters
+
+cat <<EOF | sudo tee /etc/sysctl.d/99-kubernetes-cri.conf
+net.bridge.bridge-nf-call-iptables = 1
+net.bridge.bridge-nf-call-ip6tables = 1
+net.ipv4.ip_forward = 1
+EOF
+
+sysctl  --system
+
+6) configure containerd:
+
+mkdir -p  /etc/containerd
+containerd config default | sudo tee /etc/containerd/config.toml
+systemctl restart containerd
+
+
+
+==========COMMON FOR MASTER & SLAVES START =============
+
+=======From here we execute only on MASTER node:==============
+7)
+
+kubeadm init
+
+It will generate the token. we use that token in worker nodes to communicate with master
+
+============================================================
+if we lost the Token on that time we can use this command:
+
+#kubeadm token create  --print-join-command
+=============================================================
+
+exit from root user
+
+
+mkdir -p $HOME/.kube
+  sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+  sudo chown $(id -u):$(id -g) $HOME/.kube/config
+
+
+8) setup the NetWorking:
+
+kubectl apply -f "https://cloud.weave.works/k8s/net?k8s-version=$(kubectl version | base64 | tr -d '\n')"
+
+======================================================
+#kubectl get nodes -o wide
+it tells about detail information of nodes..
+
+9)when instance is stopped our public Ip address is changed so on that time we execute this commands in  cluster only  and not in  workernodes.
+
+website name:- https://k21academy.com/docker-kubernetes/the-connection-to-the-server-localhost8080-was-refused/
+
+export KUBECONFIG=/etc/kubernetes/admin.conf
+
+cp /etc/kubernetes/admin.conf $HOME/
+chown $(id -u):$(id -g) $HOME/admin.conf
+export KUBECONFIG=$HOME/admin.conf
+
+echo 'export KUBECONFIG=$HOME/admin.conf' >> $HOME/.bashrc
+
+
+
+
+
+
+
+
