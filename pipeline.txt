@@ -1,0 +1,498 @@
+
+
+DEV_ORDAZZLE_RELAY_SRVR= "dev-relay.ordazzle.com"
+DEV_ORDAZZLE_EDGE_SRVR = "dev-edge.ordazzle.com"
+DEV_ORDAZZLE_BIZ1_SRVR = "dev-biz1.ordazzle.com"
+DEV_ORDAZZLE_BIZ2_SRVR = "dev-biz2.ordazzle.com"
+DEV_ORDAZZLE_BIZ3_SRVR = "dev-biz3.ordazzle.com"
+DEV_ORDAZZLE_DB_M_SRVR = "dev-db-master.ordazzle.com"
+DEV_ORDAZZLE_DB_S_SRVR = "dev-db-slave.ordazzle.com"
+TEMP_LOG_POC = "35.197.145.203"
+HUBANA_62_SERVER = "etp@172.24.2.62"
+HUBANA_193_SERVER = "etp@172.24.2.193"
+HUBANA_192_SERVER = "etp@172.24.2.192"
+
+
+TEST_ORDAZZLE_BIZ1_SRVR = "biz1-test.ordazzle.com"
+TEST_ORDAZZLE_BIZ2_SRVR = "biz2-test.ordazzle.com"
+TEST_ORDAZZLE_BIZ3_SRVR = "biz3-test.ordazzle.com"
+TEST_ORDAZZLE_RELAY_SRVR = "relay-test.ordazzle.com"
+TEST_ORDAZZLE_EDGE_SRVR = "edge-test.ordazzle.com"
+
+IMPL_ORDAZZLE_RELAY_SRVR= "relay-impl.ordazzle.com"
+IMPL_ORDAZZLE_EDGE_SRVR = "edge-impl.ordazzle.com"
+IMPL_ORDAZZLE_BIZ1_SRVR = "biz1-impl.ordazzle.com"
+IMPL_ORDAZZLE_BIZ2_SRVR = "biz2-impl.ordazzle.com"
+IMPL_ORDAZZLE_BIZ3_SRVR = "biz3-impl.ordazzle.com"
+IMPL_ORDAZZLE_DB_M_SRVR = "db-master-impl.ordazzle.com"
+IMPL_ORDAZZLE_DB_S_SRVR = "db-slave-impl.ordazzle.com"
+
+DEMO_ORDAZZLE_RELAY_SRVR= "relay-demo.ordazzle.com"
+DEMO_ORDAZZLE_EDGE_SRVR = "edge-demo.ordazzle.com"
+DEMO_ORDAZZLE_BIZ1_SRVR = "biz1-demo.ordazzle.com"
+DEMO_ORDAZZLE_BIZ2_SRVR = "biz2-demo.ordazzle.com"
+DEMO_ORDAZZLE_BIZ3_SRVR = "biz3-demo.ordazzle.com"
+DEMO_ORDAZZLE_DB_M_SRVR = "db-master-demo.ordazzle.com"
+DEMO_ORDAZZLE_DB_S_SRVR = "db-slave-demo.ordazzle.com"
+
+
+/*Deployment Stage*/
+def deploy(HOST_NAME, IMAGE_PORT, SUDO , isDockerCompose, composeFileName){
+echo "====++++ inside def deploy ++++===="
+
+/* OLD DOCKER HUB IMLEMENTATION
+	withCredentials([string(credentialsId: 'dockerPassword', variable: 'DockerHubPwd')]) {
+            sh "docker login -u etpakashkamble -p ${DockerHubPwd}"
+        }
+*/
+// NEW IMPLEMENTAITON  withCredentials([string(credentialsId: 'dockerPassword', variable: 'dockerHubPwd')]) {
+
+	withCredentials([string(credentialsId: 'dockerPassword', variable: 'DockerHubPwd')]) {
+        //sh "docker login -u etpakashkamble -p ${dockerHubPwd}"
+        def VAR_GROOVY = sh (
+            script: "ssh ${HOST_NAME} ${SUDO} docker ps -a -q --filter ancestor=${ETP_DOCKER}/${CONTAINER_NAME}",
+            returnStdout: true
+        ).trim();
+        if(VAR_GROOVY == ''){
+        
+        if(isDockerCompose != "true"){
+			sh "ssh ${HOST_NAME} ${SUDO} docker run --name=${CONTAINER_NAME} -v /home/etp/Desktop/MicroserviceLogs/${CONTAINER_NAME}:/logs -d  -p ${IMAGE_PORT}:${IMAGE_PORT}  --network=host --name ${CONTAINER_NAME} ${ETP_DOCKER}/${CONTAINER_NAME}"
+		}else{
+			sh "ssh ${HOST_NAME} ${SUDO} configServerHost=34.87.109.132 configServerPort=7595 docker-compose --compatibility -f ${composeFileName} run --name=${CONTAINER_NAME} -d ${CONTAINER_NAME}"
+		}
+            
+            
+        } else {
+            sh "ssh ${HOST_NAME} ${SUDO} docker stop ${VAR_GROOVY} "    
+            sh "ssh ${HOST_NAME} ${SUDO} docker rm -fv ${VAR_GROOVY} "
+            sh "ssh ${HOST_NAME} ${SUDO} docker image rm ${ETP_DOCKER}/${CONTAINER_NAME}"
+            if(isDockerCompose != "true"){
+				sh "ssh ${HOST_NAME} ${SUDO} docker run --name=${CONTAINER_NAME} -v /home/etp/Desktop/MicroserviceLogs/${CONTAINER_NAME}:/logs -d  -p ${IMAGE_PORT}:${IMAGE_PORT}  --network=host --name ${CONTAINER_NAME} ${ETP_DOCKER}/${CONTAINER_NAME}"
+			}else{
+//				sh "ssh ${HOST_NAME} ${SUDO} serviceName=get-product-by-id cloudConfigHost=34.87.109.132 cloudConfigPort=7595 docker-compose --compatibility -f ${composeFileName} run --name=${CONTAINER_NAME} -d ${CONTAINER_NAME}"
+						sh "ssh ${HOST_NAME} ${SUDO} docker-compose --compatibility -f ${composeFileName} run --name=${CONTAINER_NAME} -d ${CONTAINER_NAME}"
+			}
+            //sh "ssh ${HOST_NAME} ${SUDO} docker run --name=${CONTAINER_NAME} -v /home/etp/Desktop/MicroserviceLogs/${CONTAINER_NAME}:/logs -d  -p ${IMAGE_PORT}:${IMAGE_PORT}  --network=host ${ETP_DOCKER}/${CONTAINER_NAME}"
+        }
+    }
+}
+/* This will create docker image from svn code repo*/
+def createDockerImage(HOST_NAME, DOCKERFILE, DOCKERCOMPOSEFILE){
+/*  Note : new CODE >> Pointing to Docker Hub on premise
+	sh "cd configuration && docker build -f ${DOCKERFILE} -t ${ETP_DOCKER}/${CONTAINER_NAME} .."
+    sh "docker push ${ETP_DOCKER}/${CONTAINER_NAME}"
+    sh "docker rmi -f \$(docker images ${ETP_DOCKER}/${CONTAINER_NAME} -q)"
+    */
+    //sh "cd /var/jenkins_home/workspace/ && scp -r ${DOCKERCOMPOSEFILE} ${HOST_NAME}:${DOCKER_COMPOSE_DEST_PATH}"
+    
+/*  Note : OLD CODE >> Pointing to Docker Hub */
+    sh "cd configuration && docker build -f ${DOCKERFILE} -t ${ETP_DOCKER}/${CONTAINER_NAME} .."
+    /*withCredentials([string(credentialsId: 'dockerPassword', variable: 'DockerHubPwd')]) {
+        sh "docker login -u etpakashkamble -p ${DockerHubPwd}"
+    }*/
+    sh "docker push ${ETP_DOCKER}/${CONTAINER_NAME}"
+    //sh "sudo docker rmi \$(docker images ${IMAGE_NAME} -q)"
+    sh "docker rmi -f \$(docker images ${ETP_DOCKER}/${CONTAINER_NAME} -q)"
+    sh "cd /var/jenkins_home/workspace/ && scp -r ${DOCKERCOMPOSEFILE} ${HOST_NAME}:${DOCKER_COMPOSE_DEST_PATH}"
+    
+    
+}
+
+pipeline {
+    agent any
+    tools {
+        maven 'maven'
+    }
+    stages{
+        stage("Code Checkout"){
+            steps{
+                script {
+                    try {
+                        checkout([
+                            $class: 'SubversionSCM', 
+                            additionalCredentials: [], 
+                            excludedCommitMessages: '', 
+                            excludedRegions: '', 
+                            excludedRevprop: '', 
+                            excludedUsers: '', 
+                            filterChangelog: false, 
+                            ignoreDirPropChanges: false, 
+                            includedRegions: '', 
+                            locations: [[
+                                cancelProcessOnExternalsFail: true, 
+                                credentialsId: 'SVNCHECKOUT', 
+                                depthOption: 'infinity', 
+                                ignoreExternalsOption: true, 
+                                local: '.', remote: '$SVN_PATH'
+                            ]], 
+                            quietOperation: true, 
+                            workspaceUpdater: [$class: 'UpdateUpdater']
+                        ])
+                    }
+                    catch (exception) {
+                        println "Exception occured: ${exception}"
+                    }
+                }
+            }
+            post {
+	            always{
+    	            script{
+    	            echo "Print any change on SVN with current build"
+		                def changeLogSets = currentBuild.changeSets
+		                for (int i = 0; i < changeLogSets.size(); i++) {
+		                    def entries = changeLogSets[i].items
+		                    for (int j = 0; j < entries.length; j++) {
+		                        def entry = entries[j]
+		                        echo "${entry.commitId} by ${entry.author} on ${new Date(entry.timestamp)}: ${entry.msg}"
+		                        def files = new ArrayList(entry.affectedFiles)
+		                        for (int k = 0; k < files.size(); k++) {
+		                            def file = files[k]
+		                            echo "  ${file.editType.name} ${file.path}"
+		                        }
+		                    }
+		                }
+		            }
+	            }
+                success {
+                    load "/var/jenkins_home/workspace/JenkinsEnvironmentFile.properties"
+                }
+            }
+        }
+
+        stage("Maven Build"){
+            steps {
+                sh "${M2_HOME}/bin/mvn --batch-mode -V -U -e clean install -Dsurefire.useFile=false -Dmaven.test.failure.ignore"
+                junit allowEmptyResults: true, testResults: 'target/surefire-reports/TEST-*.xml'
+                script {
+                	def java = scanForIssues tool: [$class: 'Java']
+                	def javadoc = scanForIssues tool: [$class: 'JavaDoc']
+                	publishIssues issues:[java,javadoc]
+                }
+            }
+        }
+
+        stage("Deploy to TEMP_LOG_POC"){
+            when {
+                expression { return params.TEMP_LOG_POC }  
+            }
+            steps{
+                echo "====++++ Creating Docker Image and Deploying to TEMP_LOG_POC Environment ++++===="
+                createDockerImage(TEMP_LOG_POC, "Dockerfile.gcp","edge.yml" )
+                deploy(TEMP_LOG_POC, SERVICE_PORT, "sudo", "true" ,"edge.yml" )
+            }
+        }
+         stage("Deploy to DEV_EDGE"){
+            when {
+                expression { return params.DEV_EDGE }  
+            }
+            steps{
+                echo "====++++ Creating Docker Image and Deploying to DEV_ORDAZZLE_EDGE_SERVER Environment ++++===="
+                createDockerImage(DEV_ORDAZZLE_EDGE_SRVR, "Dockerfile.gcp","edge.yml" )
+                deploy(DEV_ORDAZZLE_EDGE_SERVER, SERVICE_PORT, "sudo", "true" ,"edge.yml" )
+            }
+        }
+        
+        stage("Deploy to DEV_BIZ_1"){
+            when {
+                expression { return params.DEV_BIZ_1 }  
+            }
+            steps{
+                echo "====++++ Creating Docker Image and Deploying to DEV_BIZ_1 Environment ++++===="
+                createDockerImage(DEV_ORDAZZLE_BIZ1_SRVR, "Dockerfile.gcp","biz1.yml" )
+                deploy(DEV_ORDAZZLE_BIZ1_SRVR, SERVICE_PORT, "sudo", "true" ,"biz1.yml" )
+            }
+        }
+
+        stage("Deploy to DEV_BIZ_2"){
+            when {
+                expression { return params.DEV_BIZ_2 }  
+            }
+            steps{
+                echo "====++++ Creating Docker Image and Deploying to DEV_BIZ_2 Environment ++++===="
+                createDockerImage(DEV_ORDAZZLE_BIZ2_SRVR, "Dockerfile.gcp","biz2.yml" )
+                deploy(DEV_ORDAZZLE_BIZ2_SRVR, SERVICE_PORT, "sudo", "true" ,"biz2.yml" )
+            }
+        }
+        
+         stage("Deploy to DEV_BIZ_3"){
+            when {
+                expression { return params.DEV_BIZ_3 }  
+            }
+            steps{
+                echo "====++++ Creating Docker Image and Deploying to DEV_BIZ_3 Environment ++++===="
+                createDockerImage(DEV_ORDAZZLE_BIZ3_SRVR, "Dockerfile.gcp","biz3.yml" )
+                deploy(DEV_ORDAZZLE_BIZ3_SRVR, SERVICE_PORT, "sudo", "true" ,"biz3.yml" )
+            }
+        }        
+         stage("Deploy to DEV_RELAY"){
+            when {
+                expression { return params.DEV_RELAY }  
+            }
+            steps{
+                echo "====++++ Creating Docker Image and Deploying to DEV_ORDAZZLE_RELAY_SERVER Environment ++++===="
+                createDockerImage(DEV_ORDAZZLE_RELAY_SRVR, "Dockerfile.prod","relay.yaml" )
+                deploy(DEV_ORDAZZLE_RELAY_SRVR, SERVICE_PORT, "sudo", "true" ,"relay.yaml" )
+            }
+        }
+        
+        // TESTING SERVERS STARTED 
+                 stage("Deploy to TEST_EDGE"){
+            when {
+                expression { return params.TEST_EDGE }  
+            }
+            steps{
+                echo "====++++ Creating Docker Image and Deploying to TEST_ORDAZZLE_EDGE_SERVER Environment ++++===="
+                createDockerImage(TEST_ORDAZZLE_EDGE_SRVR, "Dockerfile.gcp","test-edge.yml" )
+                deploy(TEST_ORDAZZLE_EDGE_SRVR, SERVICE_PORT, "sudo", "true" ,"test-edge.yml" )
+            }
+        }
+        
+        stage("Deploy to TEST_BIZ_1"){
+            when {
+                expression { return params.TEST_BIZ_1 }  
+            }
+            steps{
+                echo "====++++ Creating Docker Image and Deploying to DEV_ORDAZZLE_EDGE_SERVER Environment ++++===="
+                createDockerImage(TEST_ORDAZZLE_BIZ1_SRVR, "Dockerfile.test","test-biz1.yml" )
+                deploy(TEST_ORDAZZLE_BIZ1_SRVR, SERVICE_PORT, "sudo", "true" ,"test-biz1.yml" )
+            }
+        }
+
+        stage("Deploy to TEST_BIZ_2"){
+            when {
+                expression { return params.TEST_BIZ_2 }  
+            }
+            steps{
+                echo "====++++ Creating Docker Image and Deploying to DEV_ORDAZZLE_EDGE_SERVER Environment ++++===="
+                createDockerImage(TEST_ORDAZZLE_BIZ2_SRVR, "Dockerfile.test","test-biz2.yml" )
+                deploy(TEST_ORDAZZLE_BIZ2_SRVR, SERVICE_PORT, "sudo", "true" ,"test-biz2.yml" )
+            }
+        }
+        
+         stage("Deploy to TEST_BIZ_3"){
+            when {
+                expression { return params.TEST_BIZ_3 }  
+            }
+            steps{
+                echo "====++++ Creating Docker Image and Deploying to DEV_ORDAZZLE_EDGE_SERVER Environment ++++===="
+                createDockerImage(TEST_ORDAZZLE_BIZ3_SRVR, "Dockerfile.test","test-biz3.yml" )
+                deploy(TEST_ORDAZZLE_BIZ3_SRVR, SERVICE_PORT, "sudo", "true" ,"test-biz3.yml" )
+            }
+        }        
+         stage("Deploy to TEST_RELAY"){
+            when {
+                expression { return params.TEST_RELAY }  
+            }
+            steps{
+                echo "====++++ Creating Docker Image and Deploying to TEST_ORDAZZLE_RELAY_SRVR Environment ++++===="
+                createDockerImage(TEST_ORDAZZLE_RELAY_SRVR, "Dockerfile.test","test-relay.yml" )
+                deploy(TEST_ORDAZZLE_RELAY_SRVR, SERVICE_PORT, "sudo", "true" ,"test-relay.yml" )
+            }
+        }
+        
+        // PROD SERVERS STARTED 
+                 stage("Deploy to APP_EDGE"){
+            when {
+                expression { return params.APP_EDGE }  
+            }
+            steps{
+                echo "====++++ Creating Docker Image and Deploying to DEV_ORDAZZLE_EDGE_SERVER Environment ++++===="
+                createDockerImage(DEV_ORDAZZLE_EDGE_SRVR, "Dockerfile.gcp","edge.yml" )
+                deploy(DEV_ORDAZZLE_EDGE_SERVER, SERVICE_PORT, "sudo", "true" ,"edge.yml" )
+            }
+        }
+        
+        stage("Deploy to APP_BIZ_1"){
+            when {
+                expression { return params.APP_BIZ_1 }  
+            }
+            steps{
+                echo "====++++ Creating Docker Image and Deploying to DEV_ORDAZZLE_EDGE_SERVER Environment ++++===="
+                createDockerImage(DEV_ORDAZZLE_BIZ1_SRVR, "Dockerfile.gcp","biz1.yml" )
+                deploy(DEV_ORDAZZLE_BIZ1_SRVR, SERVICE_PORT, "sudo", "true" ,"biz1.yml" )
+            }
+        }
+
+        stage("Deploy to APP_BIZ_2"){
+            when {
+                expression { return params.APP_BIZ_2 }  
+            }
+            steps{
+                echo "====++++ Creating Docker Image and Deploying to DEV_ORDAZZLE_EDGE_SERVER Environment ++++===="
+                createDockerImage(DEV_ORDAZZLE_BIZ2_SRVR, "Dockerfile.gcp","biz2.yml" )
+                deploy(DEV_ORDAZZLE_BIZ2_SRVR, SERVICE_PORT, "sudo", "true" ,"biz2.yml" )
+            }
+        }
+        
+         stage("Deploy to APP_BIZ_3"){
+            when {
+                expression { return params.APP_BIZ_3 }  
+            }
+            steps{
+                echo "====++++ Creating Docker Image and Deploying to DEV_ORDAZZLE_EDGE_SERVER Environment ++++===="
+                createDockerImage(DEV_ORDAZZLE_BIZ3_SRVR, "Dockerfile.gcp","biz3.yml" )
+                deploy(DEV_ORDAZZLE_BIZ3_SRVR, SERVICE_PORT, "sudo", "true" ,"biz3.yml" )
+            }
+        }        
+         stage("Deploy to APP_RELAY"){
+            when {
+                expression { return params.APP_RELAY }  
+            }
+            steps{
+                echo "====++++ Creating Docker Image and Deploying to DEV_ORDAZZLE_RELAY_SERVER Environment ++++===="
+                createDockerImage(REMOTE_HOST_HB_62, "Dockerfile.prod","hb-main.yml" )
+                deploy(REMOTE_HOST_PROD, SERVICE_PORT, "", "true" ,"hb-main.yml" )
+            }
+        }
+        
+        // PROJECTS ENV STARTS HERE 
+          stage("Deploy to IMPL_EDGE"){
+            when {
+                expression { return params.IMPL_EDGE }  
+            }
+            steps{
+                echo "====++++ Creating Docker Image and Deploying to DEV_ORDAZZLE_EDGE_SERVER Environment ++++===="
+                createDockerImage(IMPL_ORDAZZLE_EDGE_SRVR, "Dockerfile.gcp","edge-impl.yml" )
+                deploy(IMPL_ORDAZZLE_EDGE_SRVR, SERVICE_PORT, "sudo", "true" ,"edge-impl.yml" )
+            }
+        }
+        
+        stage("Deploy to IMPL_BIZ_1"){
+            when {
+                expression { return params.IMPL_BIZ_1 }  
+            }
+            steps{
+                echo "====++++ Creating Docker Image and Deploying to DEV_BIZ_1 Environment ++++===="
+                createDockerImage(IMPL_ORDAZZLE_BIZ1_SRVR, "Dockerfile.gcp","biz1-impl.yml" )
+                deploy(IMPL_ORDAZZLE_BIZ1_SRVR, SERVICE_PORT, "sudo", "true" ,"biz1-impl.yml" )
+            }
+        }
+
+        stage("Deploy to IMPL_BIZ_2"){
+            when {
+                expression { return params.IMPL_BIZ_2 }  
+            }
+            steps{
+                echo "====++++ Creating Docker Image and Deploying to DEV_BIZ_2 Environment ++++===="
+                createDockerImage(IMPL_ORDAZZLE_BIZ2_SRVR, "Dockerfile.gcp","biz2-impl.yml" )
+                deploy(IMPL_ORDAZZLE_BIZ2_SRVR, SERVICE_PORT, "sudo", "true" ,"biz2-impl.yml" )
+            }
+        }
+        
+         stage("Deploy to IMPL_BIZ_3"){
+            when {
+                expression { return params.IMPL_BIZ_3 }  
+            }
+            steps{
+                echo "====++++ Creating Docker Image and Deploying to DEV_BIZ_3 Environment ++++===="
+                createDockerImage(IMPL_ORDAZZLE_BIZ3_SRVR, "Dockerfile.gcp","biz3-impl.yml" )
+                deploy(IMPL_ORDAZZLE_BIZ3_SRVR, SERVICE_PORT, "sudo", "true" ,"biz3-impl.yml" )
+            }
+        }        
+         stage("Deploy to IMPL_RELAY"){
+            when {
+                expression { return params.IMPL_RELAY }  
+            }
+            steps{
+                echo "====++++ Creating Docker Image and Deploying to DEV_ORDAZZLE_RELAY_SERVER Environment ++++===="
+                createDockerImage(IMPL_ORDAZZLE_RELAY_SRVR, "Dockerfile.gcp","relay-impl.yaml" )
+                deploy(IMPL_ORDAZZLE_RELAY_SRVR, SERVICE_PORT, "sudo", "true" ,"relay-impl.yaml" )
+            }
+        }
+        
+        // PROJECTS ENV ENDS HERE
+        
+        // DEMO ENV ENDS HERE
+        
+        stage("Deploy to DEMO_EDGE"){
+            when {
+                expression { return params.DEMO_EDGE }  
+            }
+            steps{
+                echo "====++++ Creating Docker Image and Deploying to DEV_ORDAZZLE_DEMO_SERVER Environment ++++===="
+                createDockerImage(DEMO_ORDAZZLE_EDGE_SRVR, "Dockerfile.gcp","edge-demo.yml" )
+                deploy(DEMO_ORDAZZLE_EDGE_SRVR, SERVICE_PORT, "sudo", "true" ,"edge-demo.yml" )
+            }
+        }
+        
+        stage("Deploy to DEMO_BIZ_1"){
+            when {
+                expression { return params.DEMO_BIZ_1 }  
+            }
+            steps{
+                echo "====++++ Creating Docker Image and Deploying to DEMO_BIZ_1 Environment ++++===="
+                createDockerImage(DEMO_ORDAZZLE_BIZ1_SRVR, "Dockerfile.gcp","biz1-demo.yml" )
+                deploy(DEMO_ORDAZZLE_BIZ1_SRVR, SERVICE_PORT, "sudo", "true" ,"biz1-demo.yml" )
+            }
+        }
+        stage("Deploy to DEMO_BIZ_2"){
+            when {
+                expression { return params.DEMO_BIZ_2 }  
+            }
+            steps{
+                echo "====++++ Creating Docker Image and Deploying to DEMO_BIZ_2 Environment ++++===="
+                createDockerImage(DEMO_ORDAZZLE_BIZ2_SRVR, "Dockerfile.gcp","biz2-demo.yml" )
+                deploy(DEMO_ORDAZZLE_BIZ2_SRVR, SERVICE_PORT, "sudo", "true" ,"biz2-demo.yml" )
+            }
+        }
+        
+          stage("Deploy to DEMO_BIZ_3"){
+            when {
+                expression { return params.DEMO_BIZ_3 }  
+            }
+            steps{
+                echo "====++++ Creating Docker Image and Deploying to DEMO_BIZ_3 Environment ++++===="
+                createDockerImage(DEMO_ORDAZZLE_BIZ3_SRVR, "Dockerfile.gcp","biz3-demo.yml" )
+                deploy(DEMO_ORDAZZLE_BIZ3_SRVR, SERVICE_PORT, "sudo", "true" ,"biz3-demo.yml" )
+            }
+        }        
+        // Hubanaportal settings
+        /*
+        stage("Deploy to Hubanaportal_172.24.2.62"){
+            when {
+                expression { return params.HUBANA_62 }  
+            }
+            steps{
+                echo "====++++ Creating Docker Image and Deploying to Hubanaportal_172.24.2.62 Environment ++++===="
+                createDockerImage(HUBANA_62, "Dockerfile.prod","hb-main.yml" )
+                deploy(HUBANA_62, SERVICE_PORT, "", "true" ,"hb-main.yml" )
+            }
+        }
+        
+        stage("Deploy to Hubanaportal_172.24.2.192"){
+            when {
+                expression { return params.HUBANA_192 }  
+            }
+            steps{
+                echo "====++++ Creating Docker Image and Deploying to Hubanaportal_172.24.2.192 Environment ++++===="
+                createDockerImage(HUBANA_192, "Dockerfile.prod","hb-main.yml" )
+                deploy(HUBANA_192, SERVICE_PORT, "", "true" ,"hb-main.yml" )
+            }
+        }
+        
+        stage("Deploy to Hubanaportal_172.24.2.193"){
+            when {
+                expression { return params.HUBANA_193 }  
+            }
+            steps{
+                echo "====++++ Creating Docker Image and Deploying to Hubanaportal_172.24.2.193 Environment ++++===="
+                createDockerImage(HUBANA_193, "Dockerfile.prod","hb-main.yml" )
+                deploy(HUBANA_193, SERVICE_PORT, "", "true" ,"hb-main.yml" )
+            }
+        }
+        */
+}
+    post {
+      
+        success {
+        	cleanWs()
+           /* Commenting this for now but later on this needs to be checked.
+           archiveArtifacts artifacts: 'target/*.jar', onlyIfSuccessful: true
+           */
+        }
+        failure {
+        	cleanWs()
+             echo "====++++Build Failed++++===="
+        }
+    }
+}
